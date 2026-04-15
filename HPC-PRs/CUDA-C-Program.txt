@@ -1,0 +1,193 @@
+$ sudo lshw -short | grep -i display -> Test hardware
+sudo apt install ubuntu-drivers-common
+sudo apt install nvidia-driver-535
+sudo reboot now
+sudo apt install gcc
+gcc --version
+apt list linux-headers-$(uname -r) 
+Desired: inux-headers-6.5.0-18-generic. If unavailable:
+sudo apt-key del 7fa2af80
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt install cuda-toolkit
+nvcc --version
+nvcc: NVIDIA (R) Cuda compiler driver
+Copyright (c) 2005-2023 NVIDIA Corporation
+Built on Wed_Nov_22_10:17:15_PST_2023
+Cuda compilation tools, release 12.3, V12.3.107
+Build cuda_12.3.r12.3/compiler.33567101_0
+export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
+nano ~/.bashrc
+Add the export line at end of line for the file bashrc
+
+Save program file with .cu extension
+
+Compile:
+nvcc gpu_math.cu -o gpu_math
+./gpu_math
+
+#include <iostream>
+#include <cuda.h>
+
+using namespace std;
+
+// ==========================================
+// 1. CUDA KERNELS (Run on GPU)
+// ==========================================
+
+__global__ void vectorAddKernel(int *a, int *b, int *c, int n) {
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id < n) {
+        c[id] = a[id] + b[id];
+    }
+}
+
+__global__ void matrixMulKernel(int *a, int *b, int *c, int n) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < n && col < n) {
+        int sum = 0;
+        for (int i = 0; i < n; i++) {
+            sum += a[row * n + i] * b[i * n + col];
+        }
+        c[row * n + col] = sum;
+    }
+}
+
+// ==========================================
+// 2. HOST FUNCTIONS (Run on CPU)
+// ==========================================
+
+void performVectorAddition() {
+    int n = 1000000; // 1 Million elements to get a measurable time
+    int size = n * sizeof(int);
+
+    int *h_a = new int[n];
+    int *h_b = new int[n];
+    int *h_c = new int[n];
+
+    for (int i = 0; i < n; i++) {
+        h_a[i] = i;
+        h_b[i] = i * 2;
+    }
+
+    int *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, size);
+    cudaMalloc(&d_b, size);
+    cudaMalloc(&d_c, size);
+
+    cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
+
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+
+    // --- SETUP CUDA EVENTS FOR TIMING ---
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    // Record start time
+    cudaEventRecord(start);
+
+    // Launch Kernel
+    vectorAddKernel<<<blocksPerGrid, threadsPerBlock>>>(d_a, d_b, d_c, n);
+
+    // Record stop time
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop); // Wait for GPU to finish
+
+    // Calculate elapsed time
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
+
+    cout << "\n--- Vector Addition Results (N=" << n << ") ---" << endl;
+    cout << "Sample Output (First 5 elements):" << endl;
+    for (int i = 0; i < 5; i++) {
+        cout << h_a[i] << " + " << h_b[i] << " = " << h_c[i] << endl;
+    }
+
+    // PRINT METRIC
+    cout << "\n>> Kernel Execution Time: " << milliseconds << " ms <<" << endl;
+
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
+    delete[] h_a; delete[] h_b; delete[] h_c;
+}
+
+void performMatrixMultiplication() {
+    int n = 512; // 512x512 Matrix
+    int size = n * n * sizeof(int);
+
+    int *h_a = new int[n * n];
+    int *h_b = new int[n * n];
+    int *h_c = new int[n * n];
+
+    for (int i = 0; i < n * n; i++) {
+        h_a[i] = 1;
+        h_b[i] = 2;
+    }
+
+    int *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, size);
+    cudaMalloc(&d_b, size);
+    cudaMalloc(&d_c, size);
+
+    cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(16, 16);
+    dim3 blocksPerGrid((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                       (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    // --- SETUP CUDA EVENTS FOR TIMING ---
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    // Record start time
+    cudaEventRecord(start);
+
+    // Launch Kernel
+    matrixMulKernel<<<blocksPerGrid, threadsPerBlock>>>(d_a, d_b, d_c, n);
+
+    // Record stop time
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    // Calculate elapsed time
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
+
+    cout << "\n--- Matrix Multiplication Results (" << n << "x" << n << ") ---" << endl;
+    cout << "Sample Output (Top-Left 3x3 Corner):" << endl;
+    for (int row = 0; row < 3; row++) {
+        for (int col = 0; col < 3; col++) {
+            cout << h_c[row * n + col] << " ";
+        }
+        cout << endl;
+    }
+
+    // PRINT METRIC
+    cout << "\n>> Kernel Execution Time: " << milliseconds << " ms <<" << endl;
+
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
+    delete[] h_a; delete[] h_b; delete[] h_c;
+}
+
+int main() {
+    cout << "==================================" << endl;
+    cout << "   CUDA Parallel Operations       " << endl;
+    cout << "==================================" << endl;
+
+    performVectorAddition();
+    performMatrixMultiplication();
+
+    return 0;
+}
