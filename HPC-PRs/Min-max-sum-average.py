@@ -2,6 +2,7 @@ import multiprocessing
 import random
 import time
 import sys
+import os
 
 # ==========================================
 # 1. WORKER FUNCTION (Executes on specific Core)
@@ -13,6 +14,11 @@ def reduction_worker(chunk):
     """
     if not chunk:
         return None
+        
+    p_name = multiprocessing.current_process().name
+    pid = os.getpid()
+    print(f"  [Worker] {p_name} (PID: {pid}) processing chunk of size {len(chunk)}")
+    # <----------------------------------------------------------->
     
     # Initialize local variables
     local_min = chunk[0]
