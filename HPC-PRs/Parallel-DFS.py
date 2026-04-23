@@ -56,16 +56,52 @@ def parallel_dfs(graph, start_node):
                 print(f"Visited: {node}")
                 visited.add(node)
 
-if __name__ == '__main__':
-    # Same graph
-    graph = {
-        0: [1, 2],
-        1: [3, 4],   # Branch 1
-        2: [5, 6],   # Branch 2
-        3: [], 4: [], 5: [], 6: []
-    }
+def get_user_graph():
+    """Prompts the user to build a graph dynamically via the terminal."""
+    graph = {}
+    print("--- Custom Graph Builder ---")
+    print("Enter edges one by one to build an undirected graph.")
+    print("Format: 'u v' (e.g., to connect node 0 and 1, type '0 1').")
+    print("Press Enter on an empty line when you are finished.\n")
 
-    print("\nRunning Parallel DFS on Linux...")
-    start_time = time.time()
-    parallel_dfs(graph, 0)
-    print(f"Time taken: {time.time() - start_time:.4f} seconds")
+    while True:
+        user_input = input("Enter edge (or press Enter to finish): ").strip()
+        if not user_input:
+            break
+
+        try:
+            u, v = map(int, user_input.split())
+            
+            # Initialize nodes if they don't exist
+            if u not in graph: graph[u] = []
+            if v not in graph: graph[v] = []
+
+            # Add bidirectional edges (undirected graph)
+            if v not in graph[u]: graph[u].append(v)
+            if u not in graph[v]: graph[v].append(u)
+
+        except ValueError:
+            print("Invalid input. Please enter two integers separated by a space (e.g., '0 1').")
+
+    return graph
+
+if __name__ == '__main__':
+    # Build the graph from user input
+    graph = get_user_graph()
+
+    if not graph:
+        print("No edges were entered. Exiting program.")
+    else:
+        # Ask for the starting node
+        try:
+            start_node = int(input("\nEnter the starting node for DFS: ").strip())
+            if start_node not in graph:
+                print(f"Warning: Node {start_node} is not in the graph. The DFS will process this single node and exit.")
+        except ValueError:
+            print("Invalid input. Defaulting to the first available node.")
+            start_node = list(graph.keys())
+
+        print("\nRunning Parallel DFS on Linux...")
+        start_time = time.time()
+        parallel_dfs(graph, start_node)
+        print(f"\nTime taken: {time.time() - start_time:.4f} seconds")
