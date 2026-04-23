@@ -1,0 +1,217 @@
+!pip install nvcc4jupyter
+%load_ext nvcc4jupyter
+
+%%cuda
+#include <iostream>
+#include <cuda.h>
+#include <cstdio>
+
+using namespace std;
+
+// ==========================================
+// 1. CUDA KERNELS (Run on GPU)
+// ==========================================
+
+__global__ void vectorAddKernel(int *a, int *b, int *c, int n) {
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id < n) {
+        c[id] = a[id] + b[id];
+
+        // Print only for small datasets to avoid Colab output flooding
+        if (n <= 5) {
+            printf("  [GPU Worker] Block %d, Thread %d computing index %d\n", blockIdx.x, threadIdx.x, id);
+        }
+    }
+}
+
+__global__ void matrixMulKernel(int *a, int *b, int *c, int n) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < n && col < n) {
+        int sum = 0;
+        for (int i = 0; i < n; i++) {
+            sum += a[row * n + i] * b[i * n + col];
+        }
+        c[row * n + col] = sum;
+
+        // Print only for small datasets
+        if (n <= 5) {
+            printf("  [GPU Worker] Block (%d,%d), Thread (%d,%d) computing Cell [%d][%d]\n",
+                   blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, row, col);
+        }
+    }
+}
+
+// ==========================================
+// 2. HOST FUNCTIONS (Run on CPU)
+// ==========================================
+
+void performVectorAddition() {
+    // ============================================================
+    //  CUSTOMIZATION ZONE: Edit these values right here in Colab!
+    // ============================================================
+    int n = 3; // Change to 1000000 for benchmark, or <= 5 for testing
+
+    // If n <= 5, the program uses these manual values:
+    int manual_a[] = {10, 20, 30, 40, 50};
+    int manual_b[] = { 1,  2,  3,  4,  5};
+    // ============================================================
+
+    int size = n * sizeof(int);
+    int *h_a = new int[n];
+    int *h_b = new int[n];
+    int *h_c = new int[n];
+
+    // Auto-fill logic vs Manual logic
+    if (n <= 5) {
+        for (int i = 0; i < n; i++) {
+            h_a[i] = manual_a[i];
+            h_b[i] = manual_b[i];
+        }
+    } else {
+        cout << "\n[Vector Add] N > 5. Auto-filling vectors for benchmark..." << endl;
+        for (int i = 0; i < n; i++) {
+            h_a[i] = i;
+            h_b[i] = i * 2;
+        }
+    }
+
+    int *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, size);
+    cudaMalloc(&d_b, size);
+    cudaMalloc(&d_c, size);
+
+    cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
+
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+    vectorAddKernel<<<blocksPerGrid, threadsPerBlock>>>(d_a, d_b, d_c, n);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop); 
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
+
+    cout << "\n--- Vector Addition Results (N=" << n << ") ---" << endl;
+    int print_limit = (n <= 5) ? n : 5;
+    cout << ((n <= 5) ? "Full Output:" : "Sample Output (First 5 elements):") << endl;
+    
+    for (int i = 0; i < print_limit; i++) {
+        cout << h_a[i] << " + " << h_b[i] << " = " << h_c[i] << endl;
+    }
+
+    cout << "\n>> Kernel Execution Time: " << milliseconds << " ms <<" << endl;
+
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
+    delete[] h_a; delete[] h_b; delete[] h_c;
+}
+
+void performMatrixMultiplication() {
+    // ============================================================
+    //  CUSTOMIZATION ZONE: Edit these values right here in Colab!
+    // ============================================================
+    int n = 2; // Change to 512 for benchmark, or <= 5 for testing
+
+    // If n <= 5, it pulls from this flat 5x5 array (row by row).
+    // E.g., if n=2, it only uses the first 4 numbers.
+    int manual_mat_a[] = {
+        1, 2, 3, 4, 5,
+        6, 7, 8, 9, 10,
+        11, 12, 13, 14, 15,
+        16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25
+    };
+    int manual_mat_b[] = {
+        2, 0, 0, 0, 0,
+        0, 2, 0, 0, 0,
+        0, 0, 2, 0, 0,
+        0, 0, 0, 2, 0,
+        0, 0, 0, 0, 2
+    };
+    // ============================================================
+
+    int size = n * n * sizeof(int);
+    int *h_a = new int[n * n];
+    int *h_b = new int[n * n];
+    int *h_c = new int[n * n];
+
+    // Auto-fill logic vs Manual logic
+    if (n <= 5) {
+        for (int i = 0; i < n * n; i++) {
+            h_a[i] = manual_mat_a[i];
+            h_b[i] = manual_mat_b[i];
+        }
+    } else {
+        cout << "\n[Matrix Mul] N > 5. Auto-filling matrices for benchmark..." << endl;
+        for (int i = 0; i < n * n; i++) {
+            h_a[i] = 1;
+            h_b[i] = 2;
+        }
+    }
+
+    int *d_a, *d_b, *d_c;
+    cudaMalloc(&d_a, size);
+    cudaMalloc(&d_b, size);
+    cudaMalloc(&d_c, size);
+
+    cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice);
+
+    dim3 threadsPerBlock(16, 16);
+    dim3 blocksPerGrid((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                       (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+    matrixMulKernel<<<blocksPerGrid, threadsPerBlock>>>(d_a, d_b, d_c, n);
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+
+    cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
+
+    cout << "\n--- Matrix Multiplication Results (" << n << "x" << n << ") ---" << endl;
+    
+    int print_limit = (n <= 5) ? n : 3;
+    cout << ((n <= 5) ? "Full Output Matrix:" : "Sample Output (Top-Left 3x3 Corner):") << endl;
+
+    for (int row = 0; row < print_limit; row++) {
+        for (int col = 0; col < print_limit; col++) {
+            cout << h_c[row * n + col] << " ";
+        }
+        cout << endl;
+    }
+
+    cout << "\n>> Kernel Execution Time: " << milliseconds << " ms <<" << endl;
+
+    cudaEventDestroy(start); cudaEventDestroy(stop);
+    cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
+    delete[] h_a; delete[] h_b; delete[] h_c;
+}
+
+int main() {
+    cout << "==================================" << endl;
+    cout << "   CUDA Parallel Operations       " << endl;
+    cout << "==================================" << endl;
+
+    performVectorAddition();
+    performMatrixMultiplication();
+
+    return 0;
+}
