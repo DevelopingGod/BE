@@ -66,23 +66,56 @@ def parallel_bfs(graph, start_node):
         pool.join()
         print("\nBFS Completed.")
 
-if __name__ == '__main__':
-    # Graph represented as an Adjacency List (Dictionary)
-    graph = {
-        0: [1, 2],
-        1: [0, 3, 4],
-        2: [0, 5, 6],
-        3: [1],
-        4: [1],
-        5: [2],
-        6: [2]
-    }
+def get_user_graph():
+    """Prompts the user to build a graph dynamically via the terminal."""
+    graph = {}
+    print("--- Custom Graph Builder ---")
+    print("Enter edges one by one to build an undirected graph.")
+    print("Format: 'u v' (e.g., to connect node 0 and 1, type '0 1').")
+    print("Press Enter on an empty line when you are finished.\n")
 
-    print("Running Parallel BFS on Linux...")
-    start_time = time.time()
-    parallel_bfs(graph, 0)
-    print(f"Time taken: {time.time() - start_time:.4f} seconds")
-    
+    while True:
+        user_input = input("Enter edge (or press Enter to finish): ").strip()
+        if not user_input:
+            break
+
+        try:
+            u, v = map(int, user_input.split())
+            
+            # Initialize nodes if they don't exist
+            if u not in graph: graph[u] = []
+            if v not in graph: graph[v] = []
+
+            # Add bidirectional edges (undirected graph)
+            if v not in graph[u]: graph[u].append(v)
+            if u not in graph[v]: graph[v].append(u)
+
+        except ValueError:
+            print("Invalid input. Please enter two integers separated by a space (e.g., '0 1').")
+
+    return graph
+
+if __name__ == '__main__':
+    # Build the graph from user input
+    graph = get_user_graph()
+
+    if not graph:
+        print("No edges were entered. Exiting program.")
+    else:
+        # Ask for the starting node
+        try:
+            start_node = int(input("\nEnter the starting node for BFS: ").strip())
+            if start_node not in graph:
+                print(f"Warning: Node {start_node} is not in the graph. The BFS will process this single node and exit.")
+        except ValueError:
+            print("Invalid input. Defaulting to the first available node.")
+            start_node = list(graph.keys())
+
+        print("\nRunning Parallel BFS on Linux...")
+        start_time = time.time()
+        parallel_bfs(graph, start_node)
+        print(f"Time taken: {time.time() - start_time:.4f} seconds")
+        
 """
 Examiner: "Why did you use multiprocessing instead of threading?" You: "Python has a Global Interpreter Lock (GIL) which allows only one thread to execute Python bytecode at a time. For CPU-intensive tasks like Graph Traversal, threading would not provide true parallelism. multiprocessing spawns separate OS processes, bypassing the GIL and utilizing multiple CPU cores effectively."
 """
