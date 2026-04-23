@@ -7,11 +7,16 @@ Crucial Note on OpenMP & Python: Strictly speaking, OpenMP is a standard for C, 
 
 import multiprocessing
 import time
+import os
 
 # Function to expand a node (find its unvisited neighbors)
 # This runs on separate cores
 def bfs_kernel(args):
     node, graph, visited = args
+    
+    # <-- Type this line manually:
+    print(f"  [Worker] {multiprocessing.current_process().name} (PID: {os.getpid()}) exploring Node {node}")
+    
     neighbors = []
     
     # Simulate processing time for HPC demonstration
@@ -35,6 +40,8 @@ def parallel_bfs(graph, start_node):
         print(f"BFS Order: {start_node}", end=" ")
 
         while frontier:
+        # <-- Type this line manually:
+            print(f"\n--- Processing Frontier: {frontier} ---")
             # Prepare arguments for parallel processing
             # We filter out nodes already visited to avoid redundant work
             tasks = [(u, graph, visited) for u in frontier]
