@@ -41,7 +41,8 @@ __global__ void vectorAddKernel(int *a, int *b, int *c, int n) {
     if (id < n) {
         c[id] = a[id] + b[id];
         
-        if (id < 5) {
+        // Only print from GPU if it's a small dataset to avoid terminal flood
+        if (n <= 5) {
             printf("  [GPU Worker] Block %d, Thread %d computing index %d\n", blockIdx.x, threadIdx.x, id);
         }
     }
@@ -58,7 +59,8 @@ __global__ void matrixMulKernel(int *a, int *b, int *c, int n) {
         }
         c[row * n + col] = sum;
         
-        if (row < 2 && col < 2) {
+        // Only print from GPU if it's a small dataset
+        if (n <= 5) {
             printf("  [GPU Worker] Block (%d,%d), Thread (%d,%d) computing Cell [%d][%d]\n", 
                    blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, row, col);
         }
@@ -70,16 +72,28 @@ __global__ void matrixMulKernel(int *a, int *b, int *c, int n) {
 // ==========================================
 
 void performVectorAddition() {
-    int n = 1000000; // 1 Million elements to get a measurable time
-    int size = n * sizeof(int);
+    int n;
+    cout << "\n--- 1. Vector Addition ---" << endl;
+    cout << "Enter vector size N (e.g., 3 for manual, 1000000 for benchmark): ";
+    cin >> n;
 
+    int size = n * sizeof(int);
     int *h_a = new int[n];
     int *h_b = new int[n];
     int *h_c = new int[n];
 
-    for (int i = 0; i < n; i++) {
-        h_a[i] = i;
-        h_b[i] = i * 2;
+    if (n <= 5) {
+        cout << "Enter " << n << " elements for Vector A: ";
+        for (int i = 0; i < n; i++) cin >> h_a[i];
+        
+        cout << "Enter " << n << " elements for Vector B: ";
+        for (int i = 0; i < n; i++) cin >> h_b[i];
+    } else {
+        cout << "N > 5. Auto-filling vectors to save time..." << endl;
+        for (int i = 0; i < n; i++) {
+            h_a[i] = i;
+            h_b[i] = i * 2;
+        }
     }
 
     int *d_a, *d_b, *d_c;
@@ -93,35 +107,34 @@ void performVectorAddition() {
     int threadsPerBlock = 256;
     int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
 
-    // --- SETUP CUDA EVENTS FOR TIMING ---
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    // Record start time
     cudaEventRecord(start);
-
-    // Launch Kernel
     vectorAddKernel<<<blocksPerGrid, threadsPerBlock>>>(d_a, d_b, d_c, n);
-
-    // Record stop time
     cudaEventRecord(stop);
-    cudaEventSynchronize(stop); // Wait for GPU to finish
+    cudaEventSynchronize(stop);
 
-    // Calculate elapsed time
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
 
     cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
 
     cout << "\n--- Vector Addition Results (N=" << n << ") ---" << endl;
-    cout << "Sample Output (First 5 elements):" << endl;
-    for (int i = 0; i < 5; i++) {
-        cout << h_a[i] << " + " << h_b[i] << " = " << h_c[i] << endl;
+    if (n <= 5) {
+        cout << "Full Output:" << endl;
+        for (int i = 0; i < n; i++) {
+            cout << h_a[i] << " + " << h_b[i] << " = " << h_c[i] << endl;
+        }
+    } else {
+        cout << "Sample Output (First 5 elements):" << endl;
+        for (int i = 0; i < 5; i++) {
+            cout << h_a[i] << " + " << h_b[i] << " = " << h_c[i] << endl;
+        }
     }
 
-    // PRINT METRIC
-    cout << "\n>> Kernel Execution Time: " << milliseconds << " ms <<" << endl;
+    cout << ">> Kernel Execution Time: " << milliseconds << " ms <<" << endl;
 
     cudaEventDestroy(start); cudaEventDestroy(stop);
     cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
@@ -129,16 +142,28 @@ void performVectorAddition() {
 }
 
 void performMatrixMultiplication() {
-    int n = 512; // 512x512 Matrix
-    int size = n * n * sizeof(int);
+    int n;
+    cout << "\n--- 2. Matrix Multiplication ---" << endl;
+    cout << "Enter matrix dimension N for an NxN matrix (e.g., 2 for manual, 512 for benchmark): ";
+    cin >> n;
 
+    int size = n * n * sizeof(int);
     int *h_a = new int[n * n];
     int *h_b = new int[n * n];
     int *h_c = new int[n * n];
 
-    for (int i = 0; i < n * n; i++) {
-        h_a[i] = 1;
-        h_b[i] = 2;
+    if (n <= 5) {
+        cout << "Enter " << n * n << " elements for Matrix A (row by row separated by space): \n";
+        for (int i = 0; i < n * n; i++) cin >> h_a[i];
+        
+        cout << "Enter " << n * n << " elements for Matrix B (row by row separated by space): \n";
+        for (int i = 0; i < n * n; i++) cin >> h_b[i];
+    } else {
+        cout << "N > 5. Auto-filling matrices to save time..." << endl;
+        for (int i = 0; i < n * n; i++) {
+            h_a[i] = 1;
+            h_b[i] = 2;
+        }
     }
 
     int *d_a, *d_b, *d_c;
@@ -153,38 +178,40 @@ void performMatrixMultiplication() {
     dim3 blocksPerGrid((n + threadsPerBlock.x - 1) / threadsPerBlock.x,
                        (n + threadsPerBlock.y - 1) / threadsPerBlock.y);
 
-    // --- SETUP CUDA EVENTS FOR TIMING ---
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
 
-    // Record start time
     cudaEventRecord(start);
-
-    // Launch Kernel
     matrixMulKernel<<<blocksPerGrid, threadsPerBlock>>>(d_a, d_b, d_c, n);
-
-    // Record stop time
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
-    // Calculate elapsed time
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
 
     cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost);
 
     cout << "\n--- Matrix Multiplication Results (" << n << "x" << n << ") ---" << endl;
-    cout << "Sample Output (Top-Left 3x3 Corner):" << endl;
-    for (int row = 0; row < 3; row++) {
-        for (int col = 0; col < 3; col++) {
-            cout << h_c[row * n + col] << " ";
+    if (n <= 5) {
+        cout << "Full Output Matrix:" << endl;
+        for (int row = 0; row < n; row++) {
+            for (int col = 0; col < n; col++) {
+                cout << h_c[row * n + col] << " ";
+            }
+            cout << endl;
         }
-        cout << endl;
+    } else {
+        cout << "Sample Output (Top-Left 3x3 Corner):" << endl;
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 3; col++) {
+                cout << h_c[row * n + col] << " ";
+            }
+            cout << endl;
+        }
     }
 
-    // PRINT METRIC
-    cout << "\n>> Kernel Execution Time: " << milliseconds << " ms <<" << endl;
+    cout << ">> Kernel Execution Time: " << milliseconds << " ms <<" << endl;
 
     cudaEventDestroy(start); cudaEventDestroy(stop);
     cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
