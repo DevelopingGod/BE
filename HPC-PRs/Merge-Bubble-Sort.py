@@ -22,6 +22,9 @@ def compare_and_swap(idx):
     Kernel function to compare and swap a specific pair.
     """
     global shared_arr_global
+    p_name = multiprocessing.current_process().name
+    print(f"  [Worker] {p_name} (PID: {os.getpid()}) comparing indices {idx} & {idx+1}")
+    # <----------------------------------->	
     
     # In Odd-Even sort, indices (i, i+1) in a single phase do not overlap 
     # with other pairs, so we strictly don't need a lock for data integrity 
@@ -87,6 +90,9 @@ def merge(left, right):
     return result
 
 def sequential_merge_sort(arr):
+    p_name = multiprocessing.current_process().name
+    if p_name != "MainProcess": print(f"  [Worker] {p_name} (PID: {os.getpid()}) sorting sub-array of length {len(arr)}")
+    # <----------------------------------->
     if len(arr) <= 1:
         return arr
     mid = len(arr) // 2
