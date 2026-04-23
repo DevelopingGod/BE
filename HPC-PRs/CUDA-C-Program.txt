@@ -28,6 +28,7 @@ nvcc gpu_math.cu -o gpu_math
 
 #include <iostream>
 #include <cuda.h>
+#include <cstdio>
 
 using namespace std;
 
@@ -39,6 +40,10 @@ __global__ void vectorAddKernel(int *a, int *b, int *c, int n) {
     int id = blockIdx.x * blockDim.x + threadIdx.x;
     if (id < n) {
         c[id] = a[id] + b[id];
+        
+        if (id < 5) {
+            printf("  [GPU Worker] Block %d, Thread %d computing index %d\n", blockIdx.x, threadIdx.x, id);
+        }
     }
 }
 
@@ -52,6 +57,11 @@ __global__ void matrixMulKernel(int *a, int *b, int *c, int n) {
             sum += a[row * n + i] * b[i * n + col];
         }
         c[row * n + col] = sum;
+        
+        if (row < 2 && col < 2) {
+            printf("  [GPU Worker] Block (%d,%d), Thread (%d,%d) computing Cell [%d][%d]\n", 
+                   blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y, row, col);
+        }
     }
 }
 
