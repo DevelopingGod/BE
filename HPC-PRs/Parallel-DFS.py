@@ -3,10 +3,12 @@
 
 import multiprocessing
 import time
+import os
 
 # Sequential DFS for the worker processes
 def sequential_dfs(node, graph, visited, path):
     if node not in visited:
+        print(f"    -> [PID: {os.getpid()}] traversing Node {node}")
         visited.add(node)
         path.append(node)
         if node in graph:
@@ -17,6 +19,12 @@ def sequential_dfs(node, graph, visited, path):
 # Wrapper to handle process arguments
 def dfs_wrapper(args):
     node, graph, visited_global = args
+    
+    process_name = multiprocessing.current_process().name
+    pid = os.getpid()
+    print(f"\n  [Worker] {process_name} (PID: {pid}) starting sub-tree at Node {node}")
+    
+    
     # Each process needs its own local visited set to avoid massive locking overhead
     # We copy the global visited state initially
     local_visited = set(visited_global)
