@@ -1,24 +1,10 @@
-$ sudo lshw -short | grep -i display -> Test hardware
-sudo apt install ubuntu-drivers-common
-sudo apt install nvidia-driver-535
-sudo reboot now
-sudo apt install gcc
-gcc --version
-apt list linux-headers-$(uname -r) 
-Desired: inux-headers-6.5.0-18-generic. If unavailable:
-sudo apt-key del 7fa2af80
-wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
-sudo dpkg -i cuda-keyring_1.1-1_all.deb
-sudo apt install cuda-toolkit
-nvcc --version
-nvcc: NVIDIA (R) Cuda compiler driver
-Copyright (c) 2005-2023 NVIDIA Corporation
-Built on Wed_Nov_22_10:17:15_PST_2023
-Cuda compilation tools, release 12.3, V12.3.107
-Build cuda_12.3.r12.3/compiler.33567101_0
-export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
-nano ~/.bashrc
-Add the export line at end of line for the file bashrc
+1. sudo apt update
+2. sudo apt install nvidia-cuda-toolkit
+3. lspci | grep -i nvidia
+4. nvidia-smi
+5. sudo ubuntu-drivers autoinstall
+6. sudo reboot
+7. nvidia-smi
 
 Save program file with .cu extension
 
